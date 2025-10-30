@@ -278,7 +278,7 @@ const Game = () => {
     const PI_2 = Math.PI / 2;
 
     const onMouseMove = (event: MouseEvent) => {
-      if (!isPointerLocked) return;
+      if (document.pointerLockElement !== renderer.domElement) return;
 
       const movementX = event.movementX || 0;
       const movementY = event.movementY || 0;
@@ -334,47 +334,44 @@ const Game = () => {
     };
 
     const onClick = (event: MouseEvent) => {
-      if (!isPointerLocked) {
-        if (event.target === renderer.domElement) {
-          renderer.domElement.requestPointerLock();
-        }
+      if (document.pointerLockElement !== renderer.domElement) {
+        event.preventDefault();
+        renderer.domElement.requestPointerLock();
         return;
       }
 
-      setAmmo((prev) => {
-        if (prev <= 0) return prev;
+      if (ammo <= 0) return;
 
-        createShootSound();
+      createShootSound();
 
-        weapon.position.z -= 0.05;
-        setTimeout(() => {
-          weapon.position.z += 0.05;
-        }, 50);
+      weapon.position.z -= 0.05;
+      setTimeout(() => {
+        weapon.position.z += 0.05;
+      }, 50);
 
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      
+      const enemyMeshes = enemies.map(e => e.mesh);
+      const intersects = raycaster.intersectObjects(enemyMeshes, true);
+
+      if (intersects.length > 0) {
+        const hitMesh = intersects[0].object;
+        const enemy = enemies.find(e => e.mesh.children.includes(hitMesh as THREE.Mesh));
         
-        const enemyMeshes = enemies.map(e => e.mesh);
-        const intersects = raycaster.intersectObjects(enemyMeshes, true);
-
-        if (intersects.length > 0) {
-          const hitMesh = intersects[0].object;
-          const enemy = enemies.find(e => e.mesh.children.includes(hitMesh as THREE.Mesh));
+        if (enemy) {
+          createHitSound();
+          enemy.health -= 50;
           
-          if (enemy) {
-            createHitSound();
-            enemy.health -= 50;
-            
-            if (enemy.health <= 0) {
-              scene.remove(enemy.mesh);
-              enemies.splice(enemies.indexOf(enemy), 1);
-              setScore((s) => s + 100);
-            }
+          if (enemy.health <= 0) {
+            scene.remove(enemy.mesh);
+            enemies.splice(enemies.indexOf(enemy), 1);
+            setScore((s) => s + 100);
           }
         }
+      }
 
-        return prev - 1;
-      });
+      setAmmo(prev => prev - 1);
     };
 
     const onPointerLockChange = () => {
