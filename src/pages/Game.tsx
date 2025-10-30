@@ -14,7 +14,7 @@ interface Enemy {
 const Game = () => {
   const mountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const [health, setHealth] = useState(100);
+  const [health, setHealth] = useState(1000000);
   const [ammo, setAmmo] = useState(30);
   const [score, setScore] = useState(0);
   const [isPointerLocked, setIsPointerLocked] = useState(false);
