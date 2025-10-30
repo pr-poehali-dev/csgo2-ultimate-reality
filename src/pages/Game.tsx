@@ -4,6 +4,13 @@ import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
 
+interface Enemy {
+  mesh: THREE.Group;
+  health: number;
+  speed: number;
+  lastShot: number;
+}
+
 const Game = () => {
   const mountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -11,6 +18,7 @@ const Game = () => {
   const [ammo, setAmmo] = useState(30);
   const [score, setScore] = useState(0);
   const [isPointerLocked, setIsPointerLocked] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -32,6 +40,62 @@ const Game = () => {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mountRef.current.appendChild(renderer.domElement);
+
+    const audioContext = new AudioContext();
+    
+    const createShootSound = () => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    };
+
+    const createHitSound = () => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(20, audioContext.currentTime + 0.2);
+      
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2);
+    };
+
+    const createDamageSound = () => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.3);
+      
+      gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    };
 
     const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
@@ -114,6 +178,61 @@ const Game = () => {
     wall4.receiveShadow = true;
     scene.add(wall4);
 
+    const enemies: Enemy[] = [];
+    const createEnemy = (x: number, z: number) => {
+      const enemyGroup = new THREE.Group();
+      
+      const bodyGeometry = new THREE.BoxGeometry(0.8, 1.6, 0.6);
+      const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf97316,
+        roughness: 0.7,
+        metalness: 0.3,
+      });
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.y = 0.8;
+      body.castShadow = true;
+      enemyGroup.add(body);
+
+      const headGeometry = new THREE.SphereGeometry(0.3);
+      const headMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff5722,
+        roughness: 0.6,
+      });
+      const head = new THREE.Mesh(headGeometry, headMaterial);
+      head.position.y = 1.9;
+      head.castShadow = true;
+      enemyGroup.add(head);
+
+      const eyeGeometry = new THREE.SphereGeometry(0.08);
+      const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+      leftEye.position.set(-0.1, 1.95, 0.25);
+      enemyGroup.add(leftEye);
+      
+      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+      rightEye.position.set(0.1, 1.95, 0.25);
+      enemyGroup.add(rightEye);
+
+      enemyGroup.position.set(x, 0, z);
+      scene.add(enemyGroup);
+
+      return {
+        mesh: enemyGroup,
+        health: 100,
+        speed: 0.02 + Math.random() * 0.01,
+        lastShot: 0,
+      };
+    };
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const radius = 15 + Math.random() * 5;
+      enemies.push(createEnemy(
+        Math.cos(angle) * radius,
+        Math.sin(angle) * radius
+      ));
+    }
+
     const weaponGroup = new THREE.Group();
     camera.add(weaponGroup);
     scene.add(camera);
@@ -183,6 +302,9 @@ const Game = () => {
             canJump = false;
           }
           break;
+        case 'KeyR':
+          setAmmo(30);
+          break;
       }
     };
 
@@ -203,14 +325,18 @@ const Game = () => {
       }
     };
 
-    const onClick = () => {
+    const onClick = (event: MouseEvent) => {
       if (!isPointerLocked) {
-        renderer.domElement.requestPointerLock();
+        if (event.target === renderer.domElement) {
+          renderer.domElement.requestPointerLock();
+        }
         return;
       }
 
       setAmmo((prev) => {
         if (prev <= 0) return prev;
+
+        createShootSound();
 
         weapon.position.z -= 0.05;
         setTimeout(() => {
@@ -219,13 +345,24 @@ const Game = () => {
 
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-        const intersects = raycaster.intersectObjects(boxes);
+        
+        const enemyMeshes = enemies.map(e => e.mesh);
+        const intersects = raycaster.intersectObjects(enemyMeshes, true);
 
         if (intersects.length > 0) {
-          const hitBox = intersects[0].object as THREE.Mesh;
-          scene.remove(hitBox);
-          boxes.splice(boxes.indexOf(hitBox), 1);
-          setScore((s) => s + 10);
+          const hitMesh = intersects[0].object;
+          const enemy = enemies.find(e => e.mesh.children.includes(hitMesh as THREE.Mesh));
+          
+          if (enemy) {
+            createHitSound();
+            enemy.health -= 50;
+            
+            if (enemy.health <= 0) {
+              scene.remove(enemy.mesh);
+              enemies.splice(enemies.indexOf(enemy), 1);
+              setScore((s) => s + 100);
+            }
+          }
         }
 
         return prev - 1;
@@ -292,6 +429,48 @@ const Game = () => {
         box.rotation.y += 0.005;
       });
 
+      enemies.forEach((enemy) => {
+        const directionToPlayer = new THREE.Vector3()
+          .subVectors(camera.position, enemy.mesh.position)
+          .normalize();
+
+        enemy.mesh.position.add(
+          directionToPlayer.clone().multiplyScalar(enemy.speed)
+        );
+
+        enemy.mesh.lookAt(camera.position);
+
+        const distanceToPlayer = enemy.mesh.position.distanceTo(camera.position);
+
+        if (time - enemy.lastShot > 1500 && distanceToPlayer < 20) {
+          enemy.lastShot = time;
+          
+          if (Math.random() > 0.3) {
+            setHealth((h) => {
+              const newHealth = Math.max(0, h - 10);
+              if (newHealth === 0) {
+                setGameOver(true);
+              }
+              return newHealth;
+            });
+            createDamageSound();
+          }
+        }
+      });
+
+      if (enemies.length === 0 && !gameOver) {
+        setTimeout(() => {
+          for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2;
+            const radius = 15 + Math.random() * 5;
+            enemies.push(createEnemy(
+              Math.cos(angle) * radius,
+              Math.sin(angle) * radius
+            ));
+          }
+        }, 2000);
+      }
+
       prevTime = time;
       renderer.render(scene, camera);
     };
@@ -306,25 +485,27 @@ const Game = () => {
       document.removeEventListener('pointerlockchange', onPointerLockChange);
       window.removeEventListener('resize', onWindowResize);
       mountRef.current?.removeChild(renderer.domElement);
+      audioContext.close();
     };
-  }, [isPointerLocked]);
+  }, [isPointerLocked, gameOver]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
       <div ref={mountRef} className="w-full h-full" />
 
-      {!isPointerLocked && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
-          <div className="text-center max-w-md p-8 bg-card border border-border rounded-lg">
+      {!isPointerLocked && !gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10 pointer-events-none">
+          <div className="text-center max-w-md p-8 bg-card border border-border rounded-lg pointer-events-auto">
             <Icon name="Crosshair" size={64} className="text-primary mx-auto mb-4" />
             <h2 className="text-3xl font-bold mb-4">CS:GO 2</h2>
             <p className="text-muted-foreground mb-6">
-              Нажми на экран для начала игры
+              Кликни на игровое поле для начала
             </p>
             <div className="text-left space-y-2 mb-6 text-sm">
               <p><span className="text-primary font-bold">W, A, S, D</span> - Движение</p>
               <p><span className="text-primary font-bold">Мышь</span> - Обзор</p>
               <p><span className="text-primary font-bold">ЛКМ</span> - Стрелять</p>
+              <p><span className="text-primary font-bold">R</span> - Перезарядка</p>
               <p><span className="text-primary font-bold">Пробел</span> - Прыжок</p>
               <p><span className="text-primary font-bold">ESC</span> - Выход</p>
             </div>
@@ -340,7 +521,37 @@ const Game = () => {
         </div>
       )}
 
-      {isPointerLocked && (
+      {gameOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-10">
+          <div className="text-center max-w-md p-8 bg-card border border-border rounded-lg">
+            <Icon name="Skull" size={64} className="text-destructive mx-auto mb-4" />
+            <h2 className="text-4xl font-bold mb-4 text-destructive">GAME OVER</h2>
+            <p className="text-2xl text-muted-foreground mb-2">Счет: {score}</p>
+            <p className="text-muted-foreground mb-6">
+              Ты был убит врагами!
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={() => window.location.reload()}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Icon name="RotateCcw" size={18} className="mr-2" />
+                Играть снова
+              </Button>
+              <Button
+                onClick={() => navigate('/')}
+                variant="outline"
+                className="border-primary text-primary"
+              >
+                <Icon name="Home" size={18} className="mr-2" />
+                На главную
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPointerLocked && !gameOver && (
         <>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
             <div className="relative w-8 h-8">
@@ -381,9 +592,15 @@ const Game = () => {
 
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
             <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded border border-border text-sm text-muted-foreground">
-              ESC для выхода
+              ESC для выхода • R для перезарядки
             </div>
           </div>
+
+          {health < 30 && (
+            <div className="absolute inset-0 pointer-events-none z-15">
+              <div className="w-full h-full border-8 border-red-500 opacity-30 animate-pulse"></div>
+            </div>
+          )}
         </>
       )}
     </div>
