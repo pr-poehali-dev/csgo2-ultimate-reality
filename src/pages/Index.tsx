@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +7,7 @@ import Icon from '@/components/ui/icon';
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.documentElement.style.colorScheme = 'dark';
@@ -137,7 +139,11 @@ const Index = () => {
                   Легендарный тактический шутер. Точность, стратегия, командная игра.
                 </p>
                 <div className="flex gap-4 justify-center flex-wrap">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg px-8 glow-orange animate-pulse-glow">
+                  <Button 
+                    size="lg" 
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg px-8 glow-orange animate-pulse-glow"
+                    onClick={() => navigate('/game')}
+                  >
                     <Icon name="Play" size={20} className="mr-2" />
                     Играть сейчас
                   </Button>
