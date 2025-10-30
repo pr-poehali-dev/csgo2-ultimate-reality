@@ -450,10 +450,10 @@ const Game = () => {
 
         const distanceToPlayer = enemy.mesh.position.distanceTo(camera.position);
 
-        if (time - enemy.lastShot > 1500 && distanceToPlayer < 20) {
+        if (time - enemy.lastShot > 3000 && distanceToPlayer < 20) {
           enemy.lastShot = time;
           
-          if (Math.random() > 0.3) {
+          if (Math.random() > 0.5) {
             setHealth((h) => {
               const newHealth = Math.max(0, h - 12);
               if (newHealth === 0) {
