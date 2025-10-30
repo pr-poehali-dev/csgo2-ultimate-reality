@@ -19,9 +19,17 @@ const Game = () => {
   const [score, setScore] = useState(0);
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const hasStartedRef = useRef(false);
 
   useEffect(() => {
     if (!mountRef.current) return;
+
+    if (!hasStartedRef.current) {
+      hasStartedRef.current = true;
+      setTimeout(() => {
+        mountRef.current?.querySelector('canvas')?.requestPointerLock();
+      }, 100);
+    }
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1f2c);
@@ -447,7 +455,7 @@ const Game = () => {
           
           if (Math.random() > 0.3) {
             setHealth((h) => {
-              const newHealth = Math.max(0, h - 10);
+              const newHealth = Math.max(0, h - 12);
               if (newHealth === 0) {
                 setGameOver(true);
               }
@@ -493,33 +501,7 @@ const Game = () => {
     <div className="relative w-full h-screen overflow-hidden">
       <div ref={mountRef} className="w-full h-full" />
 
-      {!isPointerLocked && !gameOver && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10 pointer-events-none">
-          <div className="text-center max-w-md p-8 bg-card border border-border rounded-lg pointer-events-auto">
-            <Icon name="Crosshair" size={64} className="text-primary mx-auto mb-4" />
-            <h2 className="text-3xl font-bold mb-4">CS:GO 2</h2>
-            <p className="text-muted-foreground mb-6">
-              Кликни на игровое поле для начала
-            </p>
-            <div className="text-left space-y-2 mb-6 text-sm">
-              <p><span className="text-primary font-bold">W, A, S, D</span> - Движение</p>
-              <p><span className="text-primary font-bold">Мышь</span> - Обзор</p>
-              <p><span className="text-primary font-bold">ЛКМ</span> - Стрелять</p>
-              <p><span className="text-primary font-bold">R</span> - Перезарядка</p>
-              <p><span className="text-primary font-bold">Пробел</span> - Прыжок</p>
-              <p><span className="text-primary font-bold">ESC</span> - Выход</p>
-            </div>
-            <Button
-              onClick={() => navigate('/')}
-              variant="outline"
-              className="border-primary text-primary"
-            >
-              <Icon name="ArrowLeft" size={18} className="mr-2" />
-              Вернуться на главную
-            </Button>
-          </div>
-        </div>
-      )}
+
 
       {gameOver && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm z-10">
